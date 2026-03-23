@@ -47,7 +47,7 @@
         <h2 style="color:#f87171;">Before Fix</h2>
         <span class="sha sha-bug">upstream/dev @ 1e807809</span>
         <p class="desc">After htmx removes its settling/swapping/request classes, elements with no other classes are left with an empty <code>class=""</code> attribute.</p>
-        <iframe id="frame-bug"></iframe>
+        <iframe id="frame-bug" src="panel-buggy.html"></iframe>
         <div class="log log-bug" id="log-bug"><span style="color:#64748b">Click the buttons above…</span></div>
     </div>
 
@@ -55,7 +55,7 @@
         <h2 style="color:#34d399;">After Fix</h2>
         <span class="sha sha-fix">1e807809 + fix</span>
         <p class="desc">Uses <code>removeClassFromElement()</code> which already cleans up empty class attributes. Three call sites fixed.</p>
-        <iframe id="frame-fix"></iframe>
+        <iframe id="frame-fix" src="panel-fixed.html"></iframe>
         <div class="log log-fix" id="log-fix"><span style="color:#64748b">Click the buttons above…</span></div>
     </div>
 
@@ -98,120 +98,6 @@
 </div>
 
 <script>
-function iframeHTML(htmxSrc, label) {
-    // The backtick template uses ${label} and ${htmxSrc} directly.
-    // The inner script tags use <\/script> to avoid breaking the outer template.
-    return '<!DOCTYPE html>\n' +
-'<html><head><meta charset="UTF-8">\n' +
-'<style>\n' +
-'  * { box-sizing: border-box; margin: 0; padding: 0; }\n' +
-'  body { font-family: -apple-system, sans-serif; background: #0f172a; color: #e2e8f0; padding: 1rem; font-size: 0.85rem; }\n' +
-'  button.act { padding: 0.3rem 0.6rem; border-radius: 4px; border: none; font-size: 0.78rem; font-weight: 600; cursor: pointer; margin-right: 0.25rem; margin-top: 0.3rem; background: #2563eb; color: white; }\n' +
-'  button.act:hover { background: #1d4ed8; }\n' +
-'  button.rst { padding: 0.3rem 0.6rem; border-radius: 4px; border: none; font-size: 0.78rem; cursor: pointer; background: #475569; color: white; }\n' +
-'  .sec { margin-bottom: 0.6rem; padding: 0.5rem; background: #1e293b; border-radius: 6px; border: 1px solid #334155; }\n' +
-'  .sec-t { font-size: 0.65rem; color: #64748b; font-weight: 600; margin-bottom: 0.2rem; text-transform: uppercase; letter-spacing: 0.05em; }\n' +
-'  .av { font-family: monospace; font-size: 0.72rem; margin-top: 0.25rem; padding: 0.25rem 0.4rem; background: #0f172a; border-radius: 4px; border: 1px solid #334155; }\n' +
-'  .bad { color: #fca5a5; } .good { color: #6ee7b7; }\n' +
-'  .cm { font-family: monospace; font-size: 0.6rem; color: #475569; margin-top: 0.4rem; }\n' +
-'</style>\n' +
-'<script>\n' +
-'// Mock XHR — htmx makes real requests through its full lifecycle,\n' +
-'// we just intercept at the network layer and respond with HTML.\n' +
-'(function() {\n' +
-'  function FakeXHR() {\n' +
-'    this._h = {}; this.readyState = 0; this.status = 0;\n' +
-'    this.responseText = ""; this.response = "";\n' +
-'    this.onreadystatechange = null; this.onload = null;\n' +
-'    this.responseHeaders = { "Content-Type": "text/html" };\n' +
-'  }\n' +
-'  FakeXHR.prototype.open = function(m, u) { this._u = u; };\n' +
-'  FakeXHR.prototype.setRequestHeader = function() {};\n' +
-'  FakeXHR.prototype.getResponseHeader = function(k) { return this.responseHeaders[k] || null; };\n' +
-'  FakeXHR.prototype.getAllResponseHeaders = function() {\n' +
-'    return Object.entries(this.responseHeaders).map(function(e) { return e[0] + ": " + e[1]; }).join("\\r\\n");\n' +
-'  };\n' +
-'  FakeXHR.prototype.overrideMimeType = function() {};\n' +
-'  FakeXHR.prototype.abort = function() {};\n' +
-'  FakeXHR.prototype.send = function() {\n' +
-'    var self = this;\n' +
-'    // Respond after 150ms — enough for htmx to add indicator classes\n' +
-'    setTimeout(function() {\n' +
-'      self.readyState = 4; self.status = 200;\n' +
-'      self.responseText = self._u.indexOf("indicator") >= 0\n' +
-'        ? "Indicator response received" : "Swapped content";\n' +
-'      self.response = self.responseText;\n' +
-'      if (self.onreadystatechange) self.onreadystatechange();\n' +
-'      if (self.onload) self.onload();\n' +
-'    }, 150);\n' +
-'  };\n' +
-'  window.XMLHttpRequest = FakeXHR;\n' +
-'})();\n' +
-'<\/script>\n' +
-'<script src="' + htmxSrc + '"><\/script>\n' +
-'</head><body>\n' +
-'\n' +
-'<div class="sec">\n' +
-'  <div class="sec-t">Test 1: hx-get swap (swappingClass + settlingClass)</div>\n' +
-'  <div id="swap-target">Waiting for swap…</div>\n' +
-'  <button class="act" hx-get="/swap" hx-target="#swap-target" hx-swap="innerHTML">Trigger hx-get</button>\n' +
-'  <div class="av" id="swap-av">—</div>\n' +
-'</div>\n' +
-'\n' +
-'<div class="sec">\n' +
-'  <div class="sec-t">Test 2: hx-indicator (requestClass)</div>\n' +
-'  <div id="ind-target">Waiting for request…</div>\n' +
-'  <div id="indicator">I am the indicator element</div>\n' +
-'  <button class="act" hx-get="/indicator" hx-target="#ind-target" hx-swap="innerHTML" hx-indicator="#indicator">Trigger with indicator</button>\n' +
-'  <div class="av" id="ind-av">—</div>\n' +
-'</div>\n' +
-'\n' +
-'<button class="rst" onclick="location.reload()">Reset</button>\n' +
-'<div class="cm">' + label + '</div>\n' +
-'\n' +
-'<script>\n' +
-'  var _label = "' + label + '";\n' +
-'  function checkEl(elId, viewId) {\n' +
-'    var el = document.getElementById(elId);\n' +
-'    var view = document.getElementById(viewId);\n' +
-'    if (!el) return;\n' +
-'    var cls = el.getAttribute("class");\n' +
-'    if (cls === null) {\n' +
-'      view.textContent = "No class attribute ✓";\n' +
-'      view.className = "av good";\n' +
-'      parent.postMessage({type:"result", label:_label, msg: elId + ": no class attr ✓", ok: true}, "*");\n' +
-'    } else if (cls.trim() === "") {\n' +
-'      view.textContent = \'class="" ✗ empty attribute left behind\';\n' +
-'      view.className = "av bad";\n' +
-'      parent.postMessage({type:"result", label:_label, msg: elId + \': class="" left behind ✗\', ok: false}, "*");\n' +
-'    } else {\n' +
-'      view.textContent = \'class="\' + cls + \'"\';\n' +
-'      view.className = "av";\n' +
-'      parent.postMessage({type:"result", label:_label, msg: elId + \': class="\' + cls + \'"\', ok: true}, "*");\n' +
-'    }\n' +
-'  }\n' +
-'  document.body.addEventListener("htmx:afterSettle", function(e) {\n' +
-'    var tid = e.detail.target ? e.detail.target.id : "";\n' +
-'    parent.postMessage({type:"action", label:_label, msg: "htmx:afterSettle on #" + tid}, "*");\n' +
-'    setTimeout(function() {\n' +
-'      if (tid === "swap-target") checkEl("swap-target", "swap-av");\n' +
-'      if (tid === "ind-target") checkEl("indicator", "ind-av");\n' +
-'    }, 100);\n' +
-'  });\n' +
-'  document.body.addEventListener("htmx:beforeRequest", function() {\n' +
-'    var ind = document.getElementById("indicator");\n' +
-'    setTimeout(function() {\n' +
-'      if (ind && ind.getAttribute("class"))\n' +
-'        parent.postMessage({type:"action", label:_label, msg: "During request: indicator class=\\"" + ind.getAttribute("class") + "\\""}, "*");\n' +
-'    }, 50);\n' +
-'  });\n' +
-'<\/script>\n' +
-'</body></html>';
-}
-
-document.getElementById('frame-bug').srcdoc = iframeHTML('builds/htmx-1e807809-dev.js', 'upstream/dev @ 1e807809');
-document.getElementById('frame-fix').srcdoc = iframeHTML('builds/htmx-1e807809-fix.js', '1e807809 + fix');
-
 var logBug = document.getElementById('log-bug');
 var logFix = document.getElementById('log-fix');
 
@@ -226,7 +112,7 @@ function addEntry(el, msg, isResult, ok) {
 
 window.addEventListener('message', function(e) {
     if (!e.data || !e.data.type) return;
-    var t = e.data.label.indexOf('dev') >= 0 ? logBug : logFix;
+    var t = e.data.label === 'buggy' ? logBug : logFix;
     if (e.data.type === 'result') addEntry(t, e.data.msg, true, e.data.ok);
     else if (e.data.type === 'action') addEntry(t, e.data.msg, false);
 });

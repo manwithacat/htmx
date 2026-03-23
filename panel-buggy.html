@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html><head><meta charset="UTF-8">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, sans-serif; background: #0f172a; color: #e2e8f0; padding: 1rem; font-size: 0.85rem; }
+  button.act { padding: 0.3rem 0.6rem; border-radius: 4px; border: none; font-size: 0.78rem; font-weight: 600; cursor: pointer; margin-right: 0.25rem; margin-top: 0.3rem; background: #2563eb; color: white; }
+  button.act:hover { background: #1d4ed8; }
+  button.rst { padding: 0.3rem 0.6rem; border-radius: 4px; border: none; font-size: 0.78rem; cursor: pointer; background: #475569; color: white; }
+  .sec { margin-bottom: 0.6rem; padding: 0.5rem; background: #1e293b; border-radius: 6px; border: 1px solid #334155; }
+  .sec-t { font-size: 0.65rem; color: #64748b; font-weight: 600; margin-bottom: 0.2rem; text-transform: uppercase; letter-spacing: 0.05em; }
+  .av { font-family: monospace; font-size: 0.72rem; margin-top: 0.25rem; padding: 0.25rem 0.4rem; background: #0f172a; border-radius: 4px; border: 1px solid #334155; }
+  .bad { color: #fca5a5; } .good { color: #6ee7b7; }
+  .cm { font-family: monospace; font-size: 0.6rem; color: #475569; margin-top: 0.4rem; }
+</style>
+<script>
+// Mock XHR — htmx makes requests through its full lifecycle,
+// we intercept at the network layer and respond with HTML.
+(function() {
+  function M() {
+    this.readyState=0;this.status=0;this.statusText='';
+    this.responseText='';this.response='';this.responseType='';
+    this.responseURL='';this.responseXML=null;
+    this.onreadystatechange=null;this.onload=null;this.onerror=null;
+    this.onabort=null;this.ontimeout=null;this.onprogress=null;this.onloadend=null;
+    this.upload={addEventListener:function(){}};
+    this._h={};this._rh={'content-type':'text/html'};
+  }
+  M.prototype.open=function(m,u,a){this._u=u;this.readyState=1;};
+  M.prototype.setRequestHeader=function(k,v){this._h[k]=v;};
+  M.prototype.getResponseHeader=function(k){return this._rh[k.toLowerCase()]||null;};
+  M.prototype.getAllResponseHeaders=function(){
+    return Object.entries(this._rh).map(function(p){return p[0]+': '+p[1];}).join('\r\n');
+  };
+  M.prototype.overrideMimeType=function(){};
+  M.prototype.abort=function(){};
+  M.prototype.addEventListener=function(e,f){this['on'+e]=f;};
+  M.prototype.removeEventListener=function(){};
+  M.prototype.send=function(){
+    var s=this;
+    setTimeout(function(){
+      s.readyState=4;s.status=200;s.statusText='OK';
+      s.responseText=s._u.indexOf('indicator')>=0?'Indicator response received':'Swapped content';
+      s.response=s.responseText;s.responseURL=s._u;
+      if(s.onreadystatechange)s.onreadystatechange(new Event('readystatechange'));
+      if(s.onload)s.onload(new Event('load'));
+      if(s.onloadend)s.onloadend(new Event('loadend'));
+    },150);
+  };
+  window.XMLHttpRequest=M;
+})();
+</script>
+<script src="builds/htmx-1e807809-dev.js"></script>
+</head><body>
+
+<div class="sec">
+  <div class="sec-t">Test 1: hx-get swap (swappingClass + settlingClass)</div>
+  <div id="swap-target">Waiting for swap…</div>
+  <button class="act" hx-get="/swap" hx-target="#swap-target" hx-swap="innerHTML">Trigger hx-get</button>
+  <div class="av" id="swap-av">—</div>
+</div>
+
+<div class="sec">
+  <div class="sec-t">Test 2: hx-indicator (requestClass)</div>
+  <div id="ind-target">Waiting for request…</div>
+  <div id="indicator">I am the indicator element</div>
+  <button class="act" hx-get="/indicator" hx-target="#ind-target" hx-swap="innerHTML" hx-indicator="#indicator">Trigger with indicator</button>
+  <div class="av" id="ind-av">—</div>
+</div>
+
+<button class="rst" onclick="location.reload()">Reset</button>
+<div class="cm">upstream/dev @ 1e807809</div>
+
+<script>
+  var _label = 'buggy';
+  function checkEl(elId, viewId) {
+    var el = document.getElementById(elId);
+    var view = document.getElementById(viewId);
+    if (!el) return;
+    var cls = el.getAttribute('class');
+    if (cls === null) {
+      view.textContent = 'No class attribute \u2713';
+      view.className = 'av good';
+      parent.postMessage({type:'result', label:_label, msg: elId + ': no class attr \u2713', ok: true}, '*');
+    } else if (cls.trim() === '') {
+      view.textContent = 'class="" \u2717 empty attribute left behind';
+      view.className = 'av bad';
+      parent.postMessage({type:'result', label:_label, msg: elId + ': class="" left behind \u2717', ok: false}, '*');
+    } else {
+      view.textContent = 'class="' + cls + '"';
+      view.className = 'av';
+      parent.postMessage({type:'result', label:_label, msg: elId + ': class="' + cls + '"', ok: true}, '*');
+    }
+  }
+  document.body.addEventListener('htmx:afterSettle', function(e) {
+    var tid = e.detail.target ? e.detail.target.id : '';
+    parent.postMessage({type:'action', label:_label, msg: 'htmx:afterSettle on #' + tid}, '*');
+    setTimeout(function() {
+      if (tid === 'swap-target') checkEl('swap-target', 'swap-av');
+      if (tid === 'ind-target') checkEl('indicator', 'ind-av');
+    }, 100);
+  });
+  document.body.addEventListener('htmx:beforeRequest', function() {
+    var ind = document.getElementById('indicator');
+    setTimeout(function() {
+      if (ind && ind.getAttribute('class'))
+        parent.postMessage({type:'action', label:_label, msg: 'During request: indicator class="' + ind.getAttribute('class') + '"'}, '*');
+    }, 50);
+  });
+</script>
+</body></html>
