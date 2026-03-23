@@ -22,8 +22,8 @@
         .sha-bug { background: #7f1d1d; color: #fca5a5; }
         .sha-fix { background: #065f46; color: #6ee7b7; }
         .desc { color: #94a3b8; font-size: 0.8rem; margin-bottom: 1rem; }
-        iframe { width: 100%; border: none; height: 320px; border-radius: 8px; background: #0f172a; }
-        .log { margin-top: 0.75rem; font-size: 0.75rem; font-family: monospace; min-height: 2.5rem; padding: 0.5rem; border-radius: 6px; overflow-y: auto; max-height: 120px; }
+        iframe { width: 100%; border: none; height: 360px; border-radius: 8px; background: #0f172a; }
+        .log { margin-top: 0.75rem; font-size: 0.72rem; font-family: monospace; min-height: 2.5rem; padding: 0.5rem; border-radius: 6px; overflow-y: auto; max-height: 140px; }
         .log-bug { background: #1a0505; border: 1px solid #450a0a; color: #fca5a5; }
         .log-fix { background: #051a0f; border: 1px solid #064e3b; color: #6ee7b7; }
         .full { grid-column: 1 / -1; }
@@ -68,6 +68,12 @@
             While benign, this means the post-swap DOM doesn't match a fresh server render — breaking snapshot tests and
             DOM comparison tools.
         </p>
+        <p style="margin-top:0.5rem;font-size:0.85rem;">
+            <strong>Test 1 (swap)</strong> exercises the swappingClass and settlingClass removal paths.
+            <strong>Test 2 (indicator)</strong> exercises the requestClass removal path — htmx adds <code>htmx-request</code>
+            to elements referenced by <code>hx-indicator</code> during a request, then removes it when the response arrives.
+            Both go through htmx's real internal request lifecycle via a mock XMLHttpRequest.
+        </p>
         <div class="diff">
             <div class="ctx">// doSettle — settlingClass removal</div>
             <div class="del">-  elt.classList.remove(htmx.config.settlingClass)</div>
@@ -82,112 +88,125 @@
             <div class="add">+  removeClassFromElement(ic, htmx.config.requestClass)</div>
         </div>
         <div class="note">
-            Each panel loads htmx built from the same base commit
+            Both panels load htmx from the same base commit
             (<a href="https://github.com/bigskysoftware/htmx/commit/1e807809">1e807809</a>).
-            Click "Trigger hx-get" to perform a swap, then inspect the resulting element's attributes.
-            The left panel leaves <code>class=""</code>; the right panel removes it cleanly.
+            A mock XMLHttpRequest intercepts network calls so htmx runs its full request lifecycle
+            (add indicator class → swap response → settle → remove classes) without needing a server.
+            The left panel shows <code>class=""</code> left behind; the right panel removes it cleanly.
         </div>
     </div>
 </div>
 
 <script>
 function iframeHTML(htmxSrc, label) {
-    return `<!DOCTYPE html>
-<html><head><meta charset="UTF-8">
-<style>
-  * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { font-family: -apple-system, sans-serif; background: #0f172a; color: #e2e8f0; padding: 1rem; font-size: 0.85rem; }
-  button { padding: 0.35rem 0.7rem; border-radius: 4px; border: none; font-size: 0.8rem; font-weight: 600; cursor: pointer; margin-right: 0.3rem; margin-top: 0.5rem; background: #2563eb; color: white; }
-  button:hover { background: #1d4ed8; }
-  .target { padding: 0.5rem; margin: 0.5rem 0; background: #1e293b; border-radius: 4px; border: 1px solid #475569; }
-  .attr-view { font-family: monospace; font-size: 0.75rem; margin-top: 0.5rem; padding: 0.4rem; background: #0f172a; border-radius: 4px; border: 1px solid #334155; min-height: 2rem; }
-  .has-empty-class { color: #fca5a5; }
-  .clean { color: #6ee7b7; }
-  .lbl { font-size: 0.7rem; color: #64748b; margin-bottom: 0.15rem; }
-  .commit { font-family: monospace; font-size: 0.65rem; color: #475569; margin-top: 0.5rem; }
-</style>
-<script src="${htmxSrc}"><\/script>
-</head><body>
-<div class="lbl">Target element (no initial classes):</div>
-<div id="target" class="target">Click a button to trigger an htmx swap</div>
-
-<button onclick="doSwap()">Trigger hx-get swap</button>
-<button onclick="doIndicator()">Trigger indicator cycle</button>
-<button onclick="resetTarget()">Reset</button>
-
-<div class="lbl" style="margin-top:0.75rem;">Element attributes after operation:</div>
-<div class="attr-view" id="attrs">Waiting…</div>
-
-<div class="commit">${label}</div>
-
-<script>
-  function showAttrs() {
-    var el = document.getElementById('target');
-    var attrs = [];
-    for (var i = 0; i < el.attributes.length; i++) {
-      var a = el.attributes[i];
-      if (a.name === 'class') {
-        attrs.push(a.name + '="' + a.value + '"');
-      }
-    }
-    var view = document.getElementById('attrs');
-    if (attrs.length === 0 || !el.hasAttribute('class')) {
-      view.innerHTML = '<span class="clean">No class attribute ✓</span>';
-      parent.postMessage({type:'result', label:'${label}', msg:'No class attribute ✓', ok: true}, '*');
-    } else if (el.getAttribute('class') === '') {
-      view.innerHTML = '<span class="has-empty-class">class="" ✗ (empty attribute left behind)</span>';
-      parent.postMessage({type:'result', label:'${label}', msg:'class="" left behind ✗', ok: false}, '*');
-    } else {
-      view.innerHTML = 'class="' + el.getAttribute('class') + '"';
-      parent.postMessage({type:'result', label:'${label}', msg:'class="' + el.getAttribute('class') + '"', ok: true}, '*');
-    }
-  }
-
-  function doSwap() {
-    var el = document.getElementById('target');
-    // Simulate what htmx does: add settling class, then remove it
-    el.classList.add(htmx.config.swappingClass);
-    parent.postMessage({type:'action', label:'${label}', msg:'Added swappingClass → class="' + el.getAttribute('class') + '"'}, '*');
-
-    // Use htmx internal: call the swap path
-    // We'll just trigger a real htmx request via the API
-    el.setAttribute('hx-swap', 'innerHTML');
-    htmx.ajax('GET', 'data:text/html,<b>Swapped content!</b>', {target: '#target', swap: 'innerHTML'}).then(function() {
-      setTimeout(function() {
-        showAttrs();
-      }, 100);
-    });
-  }
-
-  function doIndicator() {
-    var el = document.getElementById('target');
-    // Add then remove the request class (simulates indicator cycle)
-    el.classList.add(htmx.config.requestClass);
-    parent.postMessage({type:'action', label:'${label}', msg:'Added requestClass → class="' + el.getAttribute('class') + '"'}, '*');
-
-    setTimeout(function() {
-      // This is what htmx does internally
-      if (el.classList) {
-        htmx.removeClass(el, htmx.config.requestClass);
-      }
-      setTimeout(showAttrs, 50);
-    }, 200);
-  }
-
-  function resetTarget() {
-    var el = document.getElementById('target');
-    el.innerHTML = 'Click a button to trigger an htmx swap';
-    el.removeAttribute('class');
-    el.setAttribute('class', '');
-    el.removeAttribute('class');
-    el.className = 'target';
-    // Actually reset properly
-    el.outerHTML = '<div id="target" class="target">Click a button to trigger an htmx swap</div>';
-    document.getElementById('attrs').innerHTML = 'Reset';
-    parent.postMessage({type:'action', label:'${label}', msg:'Reset'}, '*');
-  }
-<\/script>
-</body></html>`;
+    // The backtick template uses ${label} and ${htmxSrc} directly.
+    // The inner script tags use <\/script> to avoid breaking the outer template.
+    return '<!DOCTYPE html>\n' +
+'<html><head><meta charset="UTF-8">\n' +
+'<style>\n' +
+'  * { box-sizing: border-box; margin: 0; padding: 0; }\n' +
+'  body { font-family: -apple-system, sans-serif; background: #0f172a; color: #e2e8f0; padding: 1rem; font-size: 0.85rem; }\n' +
+'  button.act { padding: 0.3rem 0.6rem; border-radius: 4px; border: none; font-size: 0.78rem; font-weight: 600; cursor: pointer; margin-right: 0.25rem; margin-top: 0.3rem; background: #2563eb; color: white; }\n' +
+'  button.act:hover { background: #1d4ed8; }\n' +
+'  button.rst { padding: 0.3rem 0.6rem; border-radius: 4px; border: none; font-size: 0.78rem; cursor: pointer; background: #475569; color: white; }\n' +
+'  .sec { margin-bottom: 0.6rem; padding: 0.5rem; background: #1e293b; border-radius: 6px; border: 1px solid #334155; }\n' +
+'  .sec-t { font-size: 0.65rem; color: #64748b; font-weight: 600; margin-bottom: 0.2rem; text-transform: uppercase; letter-spacing: 0.05em; }\n' +
+'  .av { font-family: monospace; font-size: 0.72rem; margin-top: 0.25rem; padding: 0.25rem 0.4rem; background: #0f172a; border-radius: 4px; border: 1px solid #334155; }\n' +
+'  .bad { color: #fca5a5; } .good { color: #6ee7b7; }\n' +
+'  .cm { font-family: monospace; font-size: 0.6rem; color: #475569; margin-top: 0.4rem; }\n' +
+'</style>\n' +
+'<script>\n' +
+'// Mock XHR — htmx makes real requests through its full lifecycle,\n' +
+'// we just intercept at the network layer and respond with HTML.\n' +
+'(function() {\n' +
+'  function FakeXHR() {\n' +
+'    this._h = {}; this.readyState = 0; this.status = 0;\n' +
+'    this.responseText = ""; this.response = "";\n' +
+'    this.onreadystatechange = null; this.onload = null;\n' +
+'    this.responseHeaders = { "Content-Type": "text/html" };\n' +
+'  }\n' +
+'  FakeXHR.prototype.open = function(m, u) { this._u = u; };\n' +
+'  FakeXHR.prototype.setRequestHeader = function() {};\n' +
+'  FakeXHR.prototype.getResponseHeader = function(k) { return this.responseHeaders[k] || null; };\n' +
+'  FakeXHR.prototype.getAllResponseHeaders = function() {\n' +
+'    return Object.entries(this.responseHeaders).map(function(e) { return e[0] + ": " + e[1]; }).join("\\r\\n");\n' +
+'  };\n' +
+'  FakeXHR.prototype.overrideMimeType = function() {};\n' +
+'  FakeXHR.prototype.abort = function() {};\n' +
+'  FakeXHR.prototype.send = function() {\n' +
+'    var self = this;\n' +
+'    // Respond after 150ms — enough for htmx to add indicator classes\n' +
+'    setTimeout(function() {\n' +
+'      self.readyState = 4; self.status = 200;\n' +
+'      self.responseText = self._u.indexOf("indicator") >= 0\n' +
+'        ? "Indicator response received" : "Swapped content";\n' +
+'      self.response = self.responseText;\n' +
+'      if (self.onreadystatechange) self.onreadystatechange();\n' +
+'      if (self.onload) self.onload();\n' +
+'    }, 150);\n' +
+'  };\n' +
+'  window.XMLHttpRequest = FakeXHR;\n' +
+'})();\n' +
+'<\/script>\n' +
+'<script src="' + htmxSrc + '"><\/script>\n' +
+'</head><body>\n' +
+'\n' +
+'<div class="sec">\n' +
+'  <div class="sec-t">Test 1: hx-get swap (swappingClass + settlingClass)</div>\n' +
+'  <div id="swap-target">Waiting for swap…</div>\n' +
+'  <button class="act" hx-get="/swap" hx-target="#swap-target" hx-swap="innerHTML">Trigger hx-get</button>\n' +
+'  <div class="av" id="swap-av">—</div>\n' +
+'</div>\n' +
+'\n' +
+'<div class="sec">\n' +
+'  <div class="sec-t">Test 2: hx-indicator (requestClass)</div>\n' +
+'  <div id="ind-target">Waiting for request…</div>\n' +
+'  <div id="indicator">I am the indicator element</div>\n' +
+'  <button class="act" hx-get="/indicator" hx-target="#ind-target" hx-swap="innerHTML" hx-indicator="#indicator">Trigger with indicator</button>\n' +
+'  <div class="av" id="ind-av">—</div>\n' +
+'</div>\n' +
+'\n' +
+'<button class="rst" onclick="location.reload()">Reset</button>\n' +
+'<div class="cm">' + label + '</div>\n' +
+'\n' +
+'<script>\n' +
+'  var _label = "' + label + '";\n' +
+'  function checkEl(elId, viewId) {\n' +
+'    var el = document.getElementById(elId);\n' +
+'    var view = document.getElementById(viewId);\n' +
+'    if (!el) return;\n' +
+'    var cls = el.getAttribute("class");\n' +
+'    if (cls === null) {\n' +
+'      view.textContent = "No class attribute ✓";\n' +
+'      view.className = "av good";\n' +
+'      parent.postMessage({type:"result", label:_label, msg: elId + ": no class attr ✓", ok: true}, "*");\n' +
+'    } else if (cls.trim() === "") {\n' +
+'      view.textContent = \'class="" ✗ empty attribute left behind\';\n' +
+'      view.className = "av bad";\n' +
+'      parent.postMessage({type:"result", label:_label, msg: elId + \': class="" left behind ✗\', ok: false}, "*");\n' +
+'    } else {\n' +
+'      view.textContent = \'class="\' + cls + \'"\';\n' +
+'      view.className = "av";\n' +
+'      parent.postMessage({type:"result", label:_label, msg: elId + \': class="\' + cls + \'"\', ok: true}, "*");\n' +
+'    }\n' +
+'  }\n' +
+'  document.body.addEventListener("htmx:afterSettle", function(e) {\n' +
+'    var tid = e.detail.target ? e.detail.target.id : "";\n' +
+'    parent.postMessage({type:"action", label:_label, msg: "htmx:afterSettle on #" + tid}, "*");\n' +
+'    setTimeout(function() {\n' +
+'      if (tid === "swap-target") checkEl("swap-target", "swap-av");\n' +
+'      if (tid === "ind-target") checkEl("indicator", "ind-av");\n' +
+'    }, 100);\n' +
+'  });\n' +
+'  document.body.addEventListener("htmx:beforeRequest", function() {\n' +
+'    var ind = document.getElementById("indicator");\n' +
+'    setTimeout(function() {\n' +
+'      if (ind && ind.getAttribute("class"))\n' +
+'        parent.postMessage({type:"action", label:_label, msg: "During request: indicator class=\\"" + ind.getAttribute("class") + "\\""}, "*");\n' +
+'    }, 50);\n' +
+'  });\n' +
+'<\/script>\n' +
+'</body></html>';
 }
 
 document.getElementById('frame-bug').srcdoc = iframeHTML('builds/htmx-1e807809-dev.js', 'upstream/dev @ 1e807809');
@@ -197,7 +216,7 @@ var logBug = document.getElementById('log-bug');
 var logFix = document.getElementById('log-fix');
 
 function addEntry(el, msg, isResult, ok) {
-    if (el.querySelector('span')) el.innerHTML = '';
+    if (el.querySelector('span')) el.textContent = '';
     var d = document.createElement('div');
     var prefix = isResult ? (ok ? '✅ ' : '❌ ') : '→ ';
     d.textContent = new Date().toLocaleTimeString() + ' ' + prefix + msg;
@@ -207,7 +226,7 @@ function addEntry(el, msg, isResult, ok) {
 
 window.addEventListener('message', function(e) {
     if (!e.data || !e.data.type) return;
-    var t = e.data.label.includes('dev') ? logBug : logFix;
+    var t = e.data.label.indexOf('dev') >= 0 ? logBug : logFix;
     if (e.data.type === 'result') addEntry(t, e.data.msg, true, e.data.ok);
     else if (e.data.type === 'action') addEntry(t, e.data.msg, false);
 });
