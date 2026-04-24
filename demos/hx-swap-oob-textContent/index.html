@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>htmx Fix — hx-swap-oob="textContent" falls back to defaultSwapStyle</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #0f172a; color: #e2e8f0; padding: 2rem; line-height: 1.6; }
+        h1 { font-size: 1.4rem; color: #f8fafc; margin-bottom: 0.25rem; }
+        .sub { color: #94a3b8; font-size: 0.85rem; margin-bottom: 1.5rem; }
+        a { color: #60a5fa; text-decoration: none; }
+        a:hover { text-decoration: underline; }
+        code { background: #334155; padding: 0.1rem 0.35rem; border-radius: 3px; font-size: 0.8rem; }
+        .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; max-width: 960px; }
+        @media (max-width: 700px) { .grid { grid-template-columns: 1fr; } }
+        .panel { border-radius: 12px; padding: 1.5rem; border: 1px solid #334155; }
+        .panel-bug { background: #1a1215; border-color: #7f1d1d; }
+        .panel-fix { background: #0f1a15; border-color: #065f46; }
+        .panel h2 { font-size: 1rem; margin-bottom: 0.15rem; }
+        .sha { font-family: monospace; font-size: 0.7rem; padding: 0.15rem 0.4rem; border-radius: 3px; display: inline-block; margin-bottom: 0.75rem; }
+        .sha-bug { background: #7f1d1d; color: #fca5a5; }
+        .sha-fix { background: #065f46; color: #6ee7b7; }
+        .desc { color: #94a3b8; font-size: 0.8rem; margin-bottom: 1rem; }
+        iframe { width: 100%; border: none; height: 460px; border-radius: 8px; background: #0f172a; }
+        .log { margin-top: 0.75rem; font-size: 0.72rem; font-family: monospace; min-height: 2.5rem; padding: 0.5rem; border-radius: 6px; overflow-y: auto; max-height: 140px; }
+        .log-bug { background: #1a0505; border: 1px solid #450a0a; color: #fca5a5; }
+        .log-fix { background: #051a0f; border: 1px solid #064e3b; color: #6ee7b7; }
+        .full { grid-column: 1 / -1; }
+        .explain { background: #172033; border-radius: 12px; padding: 1.5rem; border: 1px solid #1e3a5f; }
+        .diff { font-family: monospace; font-size: 0.78rem; line-height: 1.7; background: #0f172a; padding: 1rem; border-radius: 8px; overflow-x: auto; margin-top: 0.75rem; }
+        .del { color: #fca5a5; } .add { color: #6ee7b7; } .ctx { color: #64748b; }
+        .note { margin-top: 1rem; padding: 0.75rem 1rem; background: #1e293b; border-radius: 8px; border: 1px solid #334155; font-size: 0.8rem; color: #94a3b8; }
+        .crumb { font-size: 0.8rem; color: #64748b; margin-bottom: 1rem; }
+    </style>
+</head>
+<body>
+
+<div class="crumb"><a href="../../">← All demos</a></div>
+
+<h1>Fix: <code>hx-swap-oob="textContent"</code> falls back to <code>defaultSwapStyle</code></h1>
+<p class="sub">
+    <a href="https://github.com/bigskysoftware/htmx/issues/3563">Issue #3563</a> ·
+    Base: <a href="https://github.com/bigskysoftware/htmx/commit/d53932d4"><code>d53932d4</code></a> (dev)
+</p>
+
+<div class="grid">
+    <div class="panel panel-bug">
+        <h2 style="color:#f87171;">Before Fix</h2>
+        <span class="sha sha-bug">upstream/dev @ d53932d4</span>
+        <p class="desc"><code>swapWithStyle()</code> has no <code>case</code> for <code>textContent</code>, so OOB textContent swaps fall through to <code>defaultSwapStyle</code> (innerHTML). The OOB element's HTML gets parsed and inserted as elements rather than literal text.</p>
+        <iframe id="frame-bug" src="panel-buggy.html"></iframe>
+        <div class="log log-bug" id="log-bug"><span style="color:#64748b">Click the trigger button above…</span></div>
+    </div>
+
+    <div class="panel panel-fix">
+        <h2 style="color:#34d399;">After Fix</h2>
+        <span class="sha sha-fix">d53932d4 + fix</span>
+        <p class="desc">Adds <code>case 'textContent'</code> that mirrors the main-swap textContent path: <code>target.textContent = fragment.textContent</code>. Markup inside the OOB element is inserted as literal text.</p>
+        <iframe id="frame-fix" src="panel-fixed.html"></iframe>
+        <div class="log log-fix" id="log-fix"><span style="color:#64748b">Click the trigger button above…</span></div>
+    </div>
+
+    <div class="full explain">
+        <h2>The Bug</h2>
+        <p style="margin-top:0.5rem;font-size:0.85rem;">
+            <code>swapWithStyle()</code> handles every other OOB swap style — <code>none</code>, <code>outerHTML</code>,
+            <code>afterbegin</code>, <code>beforebegin</code>, <code>beforeend</code>, <code>afterend</code>, <code>delete</code> — but
+            has no <code>case</code> for <code>textContent</code>. Falling into the <code>default</code> branch eventually
+            calls <code>swapWithStyle(htmx.config.defaultSwapStyle, ...)</code>, which is normally <code>innerHTML</code>.
+            Result: an <code>hx-swap-oob="textContent"</code> response that contains markup gets the markup parsed and
+            inserted as elements instead of being inserted as literal text — the opposite of what
+            <a href="https://htmx.org/attributes/hx-swap/">the docs</a> describe.
+        </p>
+        <p style="margin-top:0.5rem;font-size:0.85rem;">
+            The main-swap path already handles <code>textContent</code> correctly (in the same source file) by setting
+            <code>target.textContent = content</code> directly. The fix mirrors that pattern for OOB swaps.
+        </p>
+        <p style="margin-top:0.5rem;font-size:0.85rem;">
+            Both panels send the same mock server response: <code>ok&lt;div id="alerts" hx-swap-oob="textContent"&gt;&lt;h1 style="color:red"&gt;⚠ Critical Alert&lt;/h1&gt;&lt;/div&gt;</code>.
+            The buggy version renders a red <code>&lt;h1&gt;</code> element. The fixed version renders the literal text "<code>⚠ Critical Alert</code>" — markup and all — exactly as <code>textContent</code> semantics require.
+        </p>
+        <div class="diff">
+            <div class="ctx">// src/htmx.js — swapWithStyle()</div>
+            <div class="ctx">      case 'delete':</div>
+            <div class="ctx">        swapDelete(target)</div>
+            <div class="ctx">        return</div>
+            <div class="add">+     case 'textContent':</div>
+            <div class="add">+       target.textContent = fragment.textContent</div>
+            <div class="add">+       return</div>
+            <div class="ctx">      default:</div>
+        </div>
+        <div class="note">
+            Both panels load htmx from the same base commit
+            (<a href="https://github.com/bigskysoftware/htmx/commit/d53932d4">d53932d4</a>),
+            differing only by the 3-line patch shown above.
+            A mock <code>XMLHttpRequest</code> intercepts network calls so htmx runs its full request lifecycle
+            (parse OOB elements → swap → settle) without needing a server.
+        </div>
+    </div>
+</div>
+
+<script>
+var logBug = document.getElementById('log-bug');
+var logFix = document.getElementById('log-fix');
+
+function addEntry(el, msg, isResult, ok) {
+    if (el.querySelector('span')) el.textContent = '';
+    var d = document.createElement('div');
+    var prefix = isResult ? (ok ? '✅ ' : '❌ ') : '→ ';
+    d.textContent = new Date().toLocaleTimeString() + ' ' + prefix + msg;
+    el.appendChild(d);
+    el.scrollTop = el.scrollHeight;
+}
+
+window.addEventListener('message', function(e) {
+    if (!e.data || !e.data.type) return;
+    var t = e.data.label === 'buggy' ? logBug : logFix;
+    if (e.data.type === 'result') addEntry(t, e.data.msg, true, e.data.ok);
+    else if (e.data.type === 'action') addEntry(t, e.data.msg, false);
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html><head><meta charset="UTF-8">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, sans-serif; background: #0f172a; color: #e2e8f0; padding: 1rem; font-size: 0.85rem; }
+  button.act { padding: 0.3rem 0.6rem; border-radius: 4px; border: none; font-size: 0.78rem; font-weight: 600; cursor: pointer; margin-right: 0.25rem; margin-top: 0.3rem; background: #2563eb; color: white; }
+  button.act:hover { background: #1d4ed8; }
+  button.rst { padding: 0.3rem 0.6rem; border-radius: 4px; border: none; font-size: 0.78rem; cursor: pointer; background: #475569; color: white; }
+  .sec { margin-bottom: 0.6rem; padding: 0.5rem; background: #1e293b; border-radius: 6px; border: 1px solid #334155; }
+  .sec-t { font-size: 0.65rem; color: #64748b; font-weight: 600; margin-bottom: 0.2rem; text-transform: uppercase; letter-spacing: 0.05em; }
+  .target { margin-top: 0.4rem; padding: 0.5rem; background: #0f172a; border: 1px dashed #334155; border-radius: 4px; min-height: 2.5rem; }
+  .av { font-family: monospace; font-size: 0.7rem; margin-top: 0.4rem; padding: 0.3rem 0.4rem; background: #0f172a; border-radius: 4px; border: 1px solid #334155; word-break: break-all; }
+  .label { color: #64748b; font-size: 0.65rem; text-transform: uppercase; letter-spacing: 0.05em; }
+  .bad { color: #fca5a5; } .good { color: #6ee7b7; }
+  .cm { font-family: monospace; font-size: 0.6rem; color: #475569; margin-top: 0.4rem; }
+</style>
+<script>
+// Mock XHR — htmx runs its full lifecycle, we intercept at the network layer.
+(function() {
+  function M() {
+    this.readyState=0;this.status=0;this.statusText='';
+    this.responseText='';this.response='';this.responseType='';
+    this.responseURL='';this.responseXML=null;
+    this.onreadystatechange=null;this.onload=null;this.onerror=null;
+    this.onabort=null;this.ontimeout=null;this.onprogress=null;this.onloadend=null;
+    this.upload={addEventListener:function(){}};
+    this._h={};this._rh={'content-type':'text/html'};
+  }
+  M.prototype.open=function(m,u,a){this._u=u;this.readyState=1;};
+  M.prototype.setRequestHeader=function(k,v){this._h[k]=v;};
+  M.prototype.getResponseHeader=function(k){return this._rh[k.toLowerCase()]||null;};
+  M.prototype.getAllResponseHeaders=function(){
+    return Object.entries(this._rh).map(function(p){return p[0]+': '+p[1];}).join('\r\n');
+  };
+  M.prototype.overrideMimeType=function(){};
+  M.prototype.abort=function(){};
+  M.prototype.addEventListener=function(e,f){this['on'+e]=f;};
+  M.prototype.removeEventListener=function(){};
+  M.prototype.send=function(){
+    var s=this;
+    setTimeout(function(){
+      s.readyState=4;s.status=200;s.statusText='OK';
+      // Server response: a primary swap into #status, plus an OOB swap into #alerts using textContent.
+      // Source HTML inside the OOB element contains markup — should be inserted as literal text.
+      s.responseText='ok<div id="alerts" hx-swap-oob="textContent"><h1 style="color:#dc2626">⚠ Critical Alert</h1></div>';
+      s.response=s.responseText;s.responseURL=s._u;
+      if(s.onreadystatechange)s.onreadystatechange(new Event('readystatechange'));
+      if(s.onload)s.onload(new Event('load'));
+      if(s.onloadend)s.onloadend(new Event('loadend'));
+    },150);
+  };
+  window.XMLHttpRequest=M;
+})();
+</script>
+<script src="builds/htmx-d53932d4-fix.js"></script>
+</head><body>
+
+<div class="sec">
+  <div class="sec-t">Test: hx-swap-oob="textContent" with HTML in source</div>
+  <div>Primary target (innerHTML swap):</div>
+  <div class="target" id="status">Waiting for request…</div>
+  <div style="margin-top:0.5rem;">OOB target #alerts (expects textContent swap):</div>
+  <div class="target" id="alerts"><span style="color:#94a3b8;font-style:italic">No alerts yet…</span></div>
+  <button class="act" hx-get="/alert" hx-target="#status" hx-swap="innerHTML">Trigger request</button>
+  <div class="av">
+    <span class="label">#alerts.innerHTML →</span>
+    <div id="readout-html">—</div>
+    <span class="label" style="display:block;margin-top:0.3rem">#alerts.textContent →</span>
+    <div id="readout-text">—</div>
+  </div>
+</div>
+
+<button class="rst" onclick="location.reload()">Reset</button>
+<div class="cm">d53932d4 + fix</div>
+
+<script>
+  var _label = 'fixed';
+
+  function send(type, payload) {
+    parent.postMessage(Object.assign({type: type, label: _label}, payload), '*');
+  }
+
+  document.body.addEventListener('htmx:afterOnLoad', function() {
+    setTimeout(function() {
+      var alerts = document.getElementById('alerts');
+      var html = alerts.innerHTML;
+      var text = alerts.textContent;
+      document.getElementById('readout-html').textContent = html;
+      document.getElementById('readout-text').textContent = text;
+
+      // Bug: H1 is parsed as an element instead of being inserted as literal text.
+      // Markup like "<h1>" should NOT appear as elements in the DOM if textContent worked.
+      var hasMarkup = !!alerts.querySelector('h1');
+      if (hasMarkup) {
+        send('result', {ok: false, msg: 'OOB textContent failed — <h1> rendered as element (innerHTML treated as HTML)'});
+      } else {
+        send('result', {ok: true, msg: 'OOB textContent worked — markup inserted as literal text'});
+      }
+    }, 50);
+  });
+
+  document.body.addEventListener('click', function(e) {
+    if (e.target && e.target.matches('button.act')) {
+      send('action', {msg: 'Triggered hx-get → response includes hx-swap-oob="textContent" with <h1> inside'});
+    }
+  });
+</script>
+</body></html>
