@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>htmx Fix — hidden view transition</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #0f172a; color: #e2e8f0; padding: 2rem; line-height: 1.6; }
+        h1 { font-size: 1.4rem; color: #f8fafc; margin-bottom: 0.25rem; }
+        .sub { color: #94a3b8; font-size: 0.85rem; margin-bottom: 1.5rem; }
+        a { color: #60a5fa; text-decoration: none; }
+        code { background: #334155; padding: 0.1rem 0.35rem; border-radius: 3px; font-size: 0.8rem; }
+        .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; max-width: 960px; }
+        @media (max-width: 700px) { .grid { grid-template-columns: 1fr; } }
+        .panel { border-radius: 12px; padding: 1.5rem; border: 1px solid #334155; }
+        .panel-bug { background: #1a1215; border-color: #7f1d1d; }
+        .panel-fix { background: #0f1a15; border-color: #065f46; }
+        .panel h2 { font-size: 1rem; }
+        .sha { font-family: monospace; font-size: 0.7rem; padding: 0.15rem 0.4rem; border-radius: 3px; display: inline-block; margin: 0.5rem 0; }
+        .sha-bug { background: #7f1d1d; color: #fca5a5; }
+        .sha-fix { background: #065f46; color: #6ee7b7; }
+        .desc { color: #94a3b8; font-size: 0.8rem; margin-bottom: 1rem; }
+        iframe { width: 100%; border: none; height: 200px; border-radius: 8px; }
+        .log { margin-top: 0.75rem; font-size: 0.72rem; font-family: monospace; padding: 0.5rem; border-radius: 6px; }
+        .log-bug { background: #1a0505; border: 1px solid #450a0a; color: #fca5a5; }
+        .log-fix { background: #051a0f; border: 1px solid #064e3b; color: #6ee7b7; }
+        .full { grid-column: 1 / -1; background: #172033; border-radius: 12px; padding: 1.5rem; border: 1px solid #1e3a5f; font-size: 0.85rem; }
+    </style>
+</head>
+<body>
+<h1>Fix: hidden-document view transition <code>unhandledrejection</code></h1>
+<p class="sub">
+    <a href="https://github.com/bigskysoftware/htmx/issues/3989">Issue #3989</a> ·
+    <a href="https://github.com/bigskysoftware/htmx/pull/4044">PR #4044</a> ·
+    Base: <code>7f9160f0</code>
+</p>
+<div class="grid">
+    <div class="panel panel-bug">
+        <h2 style="color:#f87171;">Before Fix</h2>
+        <span class="sha sha-bug">four-dev @ 7f9160f0</span>
+        <p class="desc">Swap still happens, but <code>ready</code> rejection is unhandled.</p>
+        <iframe src="panel-buggy.html"></iframe>
+        <div class="log log-bug" id="log-bug">Click Swap…</div>
+    </div>
+    <div class="panel panel-fix">
+        <h2 style="color:#34d399;">After Fix</h2>
+        <span class="sha sha-fix">7f9160f0 + fix</span>
+        <p class="desc">Same skip, no <code>unhandledrejection</code>.</p>
+        <iframe src="panel-fixed.html"></iframe>
+        <div class="log log-fix" id="log-fix">Click Swap…</div>
+    </div>
+    <div class="full">
+        Mock <code>startViewTransition</code> rejects <code>ready</code> the way a hidden document does. Left: unhandled InvalidStateError. Right: <code>vt.ready.catch(() =&gt; {})</code> before awaiting <code>finished</code>.
+    </div>
+</div>
+<script>
+window.addEventListener('message', function(e) {
+    if (!e.data || e.data.type !== 'result') return;
+    var el = document.getElementById(e.data.label === 'buggy' ? 'log-bug' : 'log-fix');
+    el.textContent = (e.data.ok ? '✅ ' : '❌ ') + e.data.msg;
+});
+</script>
+</body>
+</html>

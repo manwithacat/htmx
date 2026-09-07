@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html><head><meta charset="UTF-8">
+<style>
+  body { font-family: -apple-system, sans-serif; background: #0f172a; color: #e2e8f0; padding: 1rem; font-size: 0.85rem; }
+  button { padding: 0.35rem 0.7rem; border: none; border-radius: 4px; background: #2563eb; color: white; font-weight: 600; cursor: pointer; }
+  .av { font-family: monospace; font-size: 0.75rem; margin-top: 0.6rem; padding: 0.4rem; background: #1e293b; border-radius: 6px; }
+</style>
+<script>
+(function() {
+  var unhandled = 0;
+  window.addEventListener('unhandledrejection', function() { unhandled++; });
+  document.startViewTransition = function(cb) {
+    var finished = Promise.resolve().then(function() { return cb(); });
+    var ready = Promise.reject(new DOMException('Skipped ViewTransition due to document being hidden', 'InvalidStateError'));
+    return { ready: ready, finished: finished, skipped: Promise.resolve(), updateCallbackDone: finished };
+  };
+  var origFetch = window.fetch.bind(window);
+  window.fetch = function(url) {
+    if (String(url).indexOf('/swap') >= 0) {
+      return Promise.resolve(new Response('<div id="out">swapped</div>', { status: 200, headers: { 'Content-Type': 'text/html' } }));
+    }
+    return origFetch.apply(this, arguments);
+  };
+  window.addEventListener('htmx:after:swap', function() {
+    setTimeout(function() {
+      var ok = unhandled === 0;
+      var msg = 'unhandledrejection count = ' + unhandled + (ok ? ' (none)' : ' (leaked)');
+      document.getElementById('av').textContent = msg;
+      parent.postMessage({ type: 'result', label: 'buggy', ok: ok, msg: msg }, '*');
+    }, 80);
+  });
+})();
+</script>
+<script src="builds/htmx-before.js"></script>
+</head>
+<body>
+<div id="out">original</div>
+<button hx-get="/swap" hx-target="#out" hx-swap="innerHTML transition:true">Swap (hidden VT)</button>
+<div class="av" id="av">—</div>
+</body></html>

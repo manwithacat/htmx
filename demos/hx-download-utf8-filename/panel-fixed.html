@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html><head><meta charset="UTF-8">
+<style>
+  body { font-family: -apple-system, sans-serif; background: #0f172a; color: #e2e8f0; padding: 1rem; font-size: 0.85rem; }
+  button { padding: 0.35rem 0.7rem; border: none; border-radius: 4px; background: #2563eb; color: white; font-weight: 600; cursor: pointer; }
+  .av { font-family: monospace; font-size: 0.75rem; margin-top: 0.6rem; padding: 0.4rem; background: #1e293b; border-radius: 6px; }
+</style>
+<script>
+(function() {
+  var HEADER = 'attachment; filename="R_conciliation Inv priv_s.xlsx"; filename*=UTF-8\'\'R%C3%A9conciliation%20Inv%20priv%C3%A9s.xlsx';
+  var origFetch = window.fetch.bind(window);
+  window.fetch = function(url) {
+    if (String(url).indexOf('/report.xlsx') >= 0) {
+      return Promise.resolve(new Response('xlsx-bytes', {
+        status: 200,
+        headers: { 'Content-Disposition': HEADER, 'Content-Type': 'application/octet-stream', 'Content-Length': '10' }
+      }));
+    }
+    return origFetch.apply(this, arguments);
+  };
+  var origClick = HTMLAnchorElement.prototype.click;
+  HTMLAnchorElement.prototype.click = function() {
+    if (this.download) {
+      var ok = this.download === 'Réconciliation Inv privés.xlsx';
+      parent.postMessage({ type: 'result', label: 'fixed', ok: ok, msg: 'download="' + this.download + '"' }, '*');
+      document.getElementById('av').textContent = 'filename: ' + this.download;
+      return;
+    }
+    return origClick.apply(this, arguments);
+  };
+})();
+</script>
+<script src="builds/htmx-after.js"></script>
+<script src="builds/ext-after.js"></script>
+</head>
+<body>
+<button hx-get="/report.xlsx" hx-swap="download">Download</button>
+<div class="av" id="av">filename: —</div>
+</body></html>

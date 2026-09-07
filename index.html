@@ -42,6 +42,42 @@
 
     <div class="card">
         <div class="card-head">
+            <a class="card-title" href="demos/hx-download-utf8-filename/">Fix: <code>hx-download</code> prefers ASCII <code>filename=</code> over UTF-8 <code>filename*</code></a>
+            <span class="badge badge-open">PR open</span>
+            <a class="badge badge-issue" href="https://github.com/bigskysoftware/htmx/issues/4020">#4020</a>
+        </div>
+        <div class="card-desc">
+            Dual Content-Disposition headers made <code>parseFilename()</code> take the first <code>filename=</code> token and ignore RFC 5987 <code>filename*</code>.
+        </div>
+        <div class="meta">Base: 7f9160f0 · <a href="https://github.com/bigskysoftware/htmx/pull/4043">PR #4043</a> · <a href="demos/hx-download-utf8-filename/">Open demo →</a></div>
+    </div>
+
+    <div class="card">
+        <div class="card-head">
+            <a class="card-title" href="demos/view-transition-hidden/">Fix: hidden-document view transition <code>unhandledrejection</code></a>
+            <span class="badge badge-open">PR open</span>
+            <a class="badge badge-issue" href="https://github.com/bigskysoftware/htmx/issues/3989">#3989</a>
+        </div>
+        <div class="card-desc">
+            <code>startViewTransition().ready</code> rejects when the document is hidden. Catching only <code>.finished</code> leaked an unhandled InvalidStateError.
+        </div>
+        <div class="meta">Base: 7f9160f0 · <a href="https://github.com/bigskysoftware/htmx/pull/4044">PR #4044</a> · <a href="demos/view-transition-hidden/">Open demo →</a></div>
+    </div>
+
+    <div class="card">
+        <div class="card-head">
+            <a class="card-title" href="demos/timeout-error-reason/">Fix: timeout abort reason is <code>TimeoutError</code></a>
+            <span class="badge badge-open">PR open</span>
+            <a class="badge badge-issue" href="https://github.com/bigskysoftware/htmx/issues/4021">#4021</a>
+        </div>
+        <div class="card-desc">
+            Timeouts called <code>abort()</code> with no reason, so they were indistinguishable from <code>hx-sync</code> replace. Pass <code>TimeoutError</code>.
+        </div>
+        <div class="meta">Base: 7f9160f0 · <a href="https://github.com/bigskysoftware/htmx/pull/4045">PR #4045</a> · <a href="demos/timeout-error-reason/">Open demo →</a></div>
+    </div>
+
+    <div class="card">
+        <div class="card-head">
             <a class="card-title" href="demos/hx-swap-oob-textContent/">Fix: <code>hx-swap-oob="textContent"</code> falls back to <code>defaultSwapStyle</code></a>
             <span class="badge badge-open">PR open</span>
             <a class="badge badge-issue" href="https://github.com/bigskysoftware/htmx/issues/3563">#3563</a>
