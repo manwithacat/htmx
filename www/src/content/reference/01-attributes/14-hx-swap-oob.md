@@ -34,8 +34,10 @@ The second replaces the existing `#alerts` element outside that target.
 The value of the `hx-swap-oob` can be:
 
 * `true`
-* any valid [`hx-swap`](/reference/attributes/hx-swap) value
-* any valid [`hx-swap`](/reference/attributes/hx-swap) value, followed by a colon, followed by a CSS selector
+* any valid [`hx-swap`](/reference/attributes/hx-swap) value (HCON: `innerHTML target:'#table tbody'`)
+* a swap style, a colon, then a CSS selector (colon form: `beforeend:#table tbody`)
+
+These are two grammars. Colon form is a swap style immediately followed by `:`, then a selector that may contain spaces. HCON is the same grammar as [`hx-swap`](/reference/attributes/hx-swap): a swap style, then `key:value` modifiers. A leading modifier with no style (`target:#foo`) is HCON, not colon form.
 
 If the value is `true` or `outerHTML` (which are equivalent) the element will be swapped inline.
 

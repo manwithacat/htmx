@@ -65,6 +65,57 @@ describe('hx-swap-oob', function() {
         assertTextContentIs('#legacy', 'Legacy Format')
     })
 
+    it('swaps oob with colon form selector containing a space', async function () {
+        mockResponse('GET', '/test', '<div>Main</div><div hx-swap-oob="innerHTML:.outer .inner">New Content</div>')
+        createProcessedHTML('<div hx-get="/test">Click</div><div class="outer"><div class="inner">Original</div></div>');
+        find('[hx-get]').click()
+        await forRequest()
+        assertTextContentIs('.outer .inner', 'New Content')
+    })
+
+    it('swaps oob with documented descendant selector #table tbody', async function () {
+        mockResponse('GET', '/test', '<div>Main</div><div hx-swap-oob="innerHTML:#table tbody">New Body</div>')
+        createProcessedHTML('<div hx-get="/test">Click</div><table id="table"><tbody><tr><td>Old</td></tr></tbody></table>');
+        find('[hx-get]').click()
+        await forRequest()
+        assertTextContentIs('#table tbody', 'New Body')
+    })
+
+    it('swaps oob with colon form using closest extended selector', async function () {
+        mockResponse('GET', '/test', '<div>Main</div><div hx-swap-oob="innerHTML:closest #container">New Content</div>')
+        createProcessedHTML('<div id="container"><div hx-get="/test">Click</div><div>Original</div></div>');
+        find('[hx-get]').click()
+        await forRequest()
+        assertTextContentIs('#container', 'New Content')
+    })
+
+    it('swaps oob with global selector crossing shadow root boundary', async function () {
+        mockResponse('GET', '/test', '<div hx-swap-oob="innerHTML:global #outside">New Content</div>Clicked')
+        let name = 'oob-global-shadow'
+        if (!customElements.get(name)) {
+            customElements.define(name, class extends HTMLElement {
+                connectedCallback() {
+                    let root = this.attachShadow({mode: 'open'})
+                    root.innerHTML = `<button hx-get="/test" hx-target="next div">Click me!</button><div></div>`
+                    htmx.process(root)
+                }
+            })
+        }
+        createProcessedHTML(`<${name}></${name}><div id="outside">Original</div>`)
+        let wc = find(name)
+        wc.shadowRoot.querySelector('button').click()
+        await forRequest()
+        assertTextContentIs('#outside', 'New Content')
+    })
+
+    it('swaps oob with HCON target: and no explicit swap style', async function () {
+        mockResponse('GET', '/test', '<div>Main</div><div id="x" hx-swap-oob="target:#custom">Target Content</div>')
+        createProcessedHTML('<div hx-get="/test">Click</div><div id="custom">Original</div>');
+        find('[hx-get]').click()
+        await forRequest()
+        assertTextContentIs('#custom', 'Target Content')
+    })
+
     it('swaps oob to all elements matching a class selector', async function () {
         mockResponse('GET', '/test', '<div>Main</div><div hx-swap-oob="innerHTML:.target">Updated</div>')
         createProcessedHTML('<div hx-get="/test">Click</div><div class="target">A</div><div class="target">B</div>');

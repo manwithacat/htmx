@@ -1077,8 +1077,17 @@ var htmx = (() => {
 
         __createOOBTask(tasks, elt, oobValue, sourceElement) {
             let targetSelector = elt.id ? '#' + CSS.escape(elt.id) : null;
-            if (oobValue !== 'true' && oobValue && !oobValue.includes(' ')) {
-                [oobValue, targetSelector = targetSelector] = oobValue.split(/:(.*)/);
+            if (oobValue && oobValue !== 'true') {
+                // Colon form is `swapStyle:selector` (selector may contain spaces).
+                // HCON is `swapStyle key:value`, same as hx-swap. A leading HCON
+                // modifier with no style (`target:#foo`) is not colon form.
+                let colon = oobValue.indexOf(':');
+                let head = colon > 0 ? oobValue.slice(0, colon) : '';
+                let hconKey = ['target', 'settle', 'swap', 'transition', 'ignoreTitle',
+                    'scroll', 'show', 'focusScroll', 'swapEmpty', 'scrollTarget', 'showTarget'].includes(head);
+                if (colon > 0 && !head.includes(' ') && !hconKey) {
+                    [oobValue, targetSelector] = [head, oobValue.slice(colon + 1) || targetSelector];
+                }
             }
             if (oobValue === 'true' || !oobValue) oobValue = 'outerHTML';
 
